@@ -440,7 +440,7 @@
     add(x+"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF");
     var out = new Uint8Array(len), pos = 0;
     parts.forEach(function(p){ out.set(p,pos); pos += p.length; });
-    return new Blob([out],{type:"application/pdf"});
+    return new Blob([out],{type:"application/octet-stream"}); // generic type makes browsers save the file instead of opening it
   }
   document.getElementById("pdf").addEventListener("click", function(){
     var msg = document.getElementById("pdfmsg");
@@ -451,12 +451,14 @@
       if (!blob){ msg.textContent = "Sorry, the PDF could not be created. Try the Print button instead."; return; }
       blob.arrayBuffer().then(function(buf){
         var pdf = makePDF(new Uint8Array(buf), 1700, 2200);
-        var a = document.createElement("a"), safe = name.replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"");
-        a.href = URL.createObjectURL(pdf);
-        a.download = "Big-Five-Results"+(safe?"-"+safe:"")+".pdf";
+        var safe = name.replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,""),
+            fname = "Big-Five-Results"+(safe?"-"+safe:"")+".pdf",
+            url = URL.createObjectURL(pdf);
+        var a = document.createElement("a");
+        a.href = url; a.download = fname; a.style.display = "none";
         document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
-        msg.textContent = "Downloaded. Check your Downloads folder.";
+        // backup link, in case the browser blocked the automatic download
+        msg.innerHTML = 'Downloaded. If nothing was saved, <a id="pdflink" href="'+url+'" download="'+fname+'" style="color:var(--navy);font-weight:600">click here to save it</a>.';
       });
     });
   });
