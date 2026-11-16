@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Big Five Personality Inventory</title>
+<meta name="description" content="A 10-question Big Five personality inventory. Runs entirely in your browser. Nothing is saved or sent anywhere.">
+<style>
+  :root{
+    --navy:#172D60;
+    --sage:#91A66D;
+    --gold:#C1A069;
+    --violet:#847296;
+    --clay:#B9705A;      /* fifth trait color, chosen to sit with the palette */
+    --ivory:#F7F4EC;
+    --card:#FFFFFF;
+    --ink:#22283a;
+    --muted:#5d6477;
+    --line:#e4dfd0;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--ivory); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height:1.55; font-size:17px;
+  }
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif; color:var(--navy); line-height:1.2; margin:0}
+  .wrap{max-width:820px; margin:0 auto; padding:28px 18px 60px}
+  header.hero{
+    background:var(--navy); color:#fff; border-radius:var(--radius);
+    padding:34px 30px 30px; position:relative; overflow:hidden;
+  }
+  header.hero h1{color:#fff; font-size:2.1rem; margin-bottom:8px}
+  header.hero p{margin:0; color:#dfe4f1; max-width:560px}
+  .swatches{display:flex; gap:6px; margin-top:20px}
+  .swatches span{height:8px; border-radius:8px; flex:1}
+  .swatches span:nth-child(1){background:var(--gold)}
+  .swatches span:nth-child(2){background:var(--sage)}
+  .swatches span:nth-child(3){background:var(--violet)}
+  .swatches span:nth-child(4){background:var(--clay)}
+  .swatches span:nth-child(5){background:#fff; opacity:.85}
+
+  .notice{
+    background:var(--card); border:1px solid var(--line); border-left:6px solid var(--sage);
+    border-radius:12px; padding:14px 18px; margin:22px 0; font-size:.95rem; color:var(--muted);
+  }
+  .notice strong{color:var(--navy)}
+
+  .progress-wrap{position:sticky; top:0; z-index:5; background:var(--ivory); padding:10px 0 12px}
+  .progress-label{display:flex; justify-content:space-between; font-size:.85rem; color:var(--muted); margin-bottom:6px}
+  .progress{height:10px; background:#e9e4d4; border-radius:10px; overflow:hidden}
+  .progress > div{height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--sage)); border-radius:10px; transition:width .35s ease}
+
+  fieldset.q{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px 20px; margin:0 0 16px; min-width:0;
+  }
+  fieldset.q.missing{border-color:var(--clay); box-shadow:0 0 0 3px rgba(185,112,90,.18)}
+  fieldset.q legend{padding:0 6px; margin-left:-6px; font-size:1.05rem; color:var(--ink)}
+  .qnum{display:inline-block; background:var(--navy); color:#fff; border-radius:50%; width:1.7em; height:1.7em; line-height:1.7em; text-align:center; font-size:.85rem; margin-right:8px}
+  .scale{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px}
+  .scale label{position:relative; display:block; cursor:pointer}
+  .scale input{position:absolute; opacity:0; inset:0; width:100%; height:100%; cursor:pointer; margin:0}
+  .scale .pill{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    height:100%; min-height:68px; padding:8px 4px; border:2px solid var(--line); border-radius:12px;
+    background:#fcfbf7; font-size:.78rem; color:var(--muted); transition:all .15s ease;
+  }
+  .scale .pill b{font-size:1.15rem; color:var(--navy); font-family:Georgia,serif; margin-bottom:2px}
+  .scale label:hover .pill{border-color:var(--gold)}
+  .scale input:focus-visible + .pill{outline:3px solid var(--violet); outline-offset:2px}
+  .scale input:checked + .pill{background:var(--navy); border-color:var(--navy); color:#fff}
+  .scale input:checked + .pill b{color:var(--gold)}
+
+  .actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:22px}
+  button{
+    font:inherit; font-weight:600; border:0; border-radius:999px; padding:13px 28px; cursor:pointer;
+    background:var(--navy); color:#fff; transition:transform .1s ease, background .15s ease;
+  }
+  button:hover{background:#21397a}
+  button:active{transform:scale(.98)}
+  button:focus-visible{outline:3px solid var(--violet); outline-offset:3px}
+  button.secondary{background:transparent; color:var(--navy); border:2px solid var(--navy)}
+  button.secondary:hover{background:rgba(23,45,96,.07)}
+  .hint{color:var(--clay); font-size:.92rem; min-height:1.3em}
+
+  /* results */
+  #results{display:none}
+  #results.show{display:block; animation:rise .5s ease}
+  @keyframes rise{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:24px 22px; margin-bottom:18px}
+  .panel h2{font-size:1.5rem; margin-bottom:4px}
+  .panel .sub{color:var(--muted); margin:0 0 14px; font-size:.95rem}
+  .radar-wrap{max-width:640px; margin:0 auto}
+  svg text{font-family:"Segoe UI",system-ui,sans-serif}
+
+  .trait{padding:16px 0; border-top:1px solid var(--line)}
+  .trait:first-of-type{border-top:0}
+  .trait-top{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .dot{width:14px; height:14px; border-radius:50%; flex:none}
+  .trait h3{font-size:1.15rem; flex:1}
+  .chip{font-size:.8rem; font-weight:700; padding:3px 12px; border-radius:999px; color:#fff; letter-spacing:.02em}
+  .score{font-weight:700; color:var(--navy); min-width:3.6em; text-align:right}
+  .bar{height:16px; background:#eee9da; border-radius:16px; margin:10px 0 8px; overflow:hidden; position:relative}
+  .bar > i{display:block; height:100%; width:0; border-radius:16px; transition:width .9s cubic-bezier(.2,.8,.2,1)}
+  .trait p{margin:0; color:var(--muted); font-size:.93rem}
+
+  footer{margin-top:30px; font-size:.82rem; color:var(--muted); border-top:1px solid var(--line); padding-top:16px}
+  footer p{margin:0 0 6px}
+
+  @media (max-width:560px){
+    body{font-size:16px}
+    header.hero{padding:26px 20px}
+    header.hero h1{font-size:1.65rem}
+    .scale{grid-template-columns:1fr; gap:6px}
+    .scale .pill{flex-direction:row; justify-content:flex-start; gap:12px; min-height:46px; text-align:left; font-size:.9rem; padding:8px 14px}
+    .scale .pill b{margin:0}
+  }
+  @media print{
+    body{background:#fff}
+    .no-print, .progress-wrap, #quiz, header.hero .swatches{display:none !important}
+    #results{display:block !important}
+    .panel{break-inside:avoid; border-color:#ccc}
+    .bar > i, .chip, .dot{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+    header.hero{background:#fff; color:var(--navy); border:2px solid var(--navy)}
+    header.hero h1{color:var(--navy)} header.hero p{color:#333}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>Big Five Personality Inventory</h1>
+    <p>Ten quick statements, about two minutes. See how you describe yourself on five widely studied personality traits.</p>
+    <div class="swatches" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+  </header>
+
+  <div class="notice no-print">
+    <strong>Your answers stay private.</strong> This page runs entirely in your browser. Nothing is saved, collected, or sent anywhere, and no account is needed. If you close or refresh the page, your results disappear.
+  </div>
+
+  <main id="quiz">
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Answer each statement based on how well it describes you.</span><span id="count">0 of 10</span></div>
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" id="pbar"><div id="pfill"></div></div>
+    </div>
+    <form id="form" novalidate></form>
+    <div class="actions">
+      <button type="button" id="submit">See my results</button>
+      <span class="hint" id="hint" role="status" aria-live="polite"></span>
+    </div>
+  </main>
+
+  <section id="results" aria-live="polite">
+    <div class="panel">
+      <h2>Your Big Five profile</h2>
+      <p class="sub">Scores run from 1 (low) to 5 (high). No score is better or worse than another.</p>
+      <div class="radar-wrap" id="radar"></div>
+    </div>
+    <div class="panel">
+      <h2>Trait by trait</h2>
+      <p class="sub">Each score is the average of two statements.</p>
+      <div id="traits"></div>
+    </div>
+    <div class="panel">
+      <h3 style="margin-bottom:6px">Keep in mind</h3>
+      <p style="margin:0;color:var(--muted);font-size:.95rem">This is a short, self-report snapshot of how you see yourself today. It is not a test, a diagnosis, or a prediction of what you can do. Personality traits describe tendencies, and people change and grow. Every part of the profile has strengths.</p>
+    </div>
+    <div class="actions no-print">
+      <button type="button" id="print">Print or save as PDF</button>
+      <button type="button" class="secondary" id="retake">Take it again</button>
+    </div>
+  </section>
+
+  <footer>
+    <p>The BFI-10 (Big Five Inventory) was developed by Beatrice Rammstedt &amp; Oliver P. John. The instrument is available for non-commercial use (Source: GESIS).</p>
+    <p>Reference: Rammstedt, B., &amp; John, O. P. (2007). Measuring personality in one minute or less: A 10-item short version of the Big Five Inventory in English and German. <i>Journal of Research in Personality, 41</i>(1), 203–212. <a href="https://doi.org/10.1016/j.jrp.2006.02.001" style="color:var(--navy)">https://doi.org/10.1016/j.jrp.2006.02.001</a></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Items (from the BFI-10). rev = reverse scored; trait = scale it belongs to.
+  var ITEMS = [
+    {text:"I see myself as someone who is reserved.",                       rev:true,  trait:"E"},
+    {text:"I see myself as someone who is generally trusting.",             rev:false, trait:"A"},
+    {text:"I see myself as someone who tends to be lazy.",                  rev:true,  trait:"C"},
+    {text:"I see myself as someone who is relaxed.",                        rev:false, trait:"S"},
+    {text:"I see myself as someone who has few artistic interests.",        rev:true,  trait:"O"},
+    {text:"I see myself as someone who is outgoing.",                       rev:false, trait:"E"},
+    {text:"I see myself as someone who tends to find fault with others.",   rev:true,  trait:"A"},
+    {text:"I see myself as someone who does a thorough job.",               rev:false, trait:"C"},
+    {text:"I see myself as someone who gets nervous easily.",               rev:true,  trait:"S"},
+    {text:"I see myself as someone who has an active imagination.",         rev:false, trait:"O"}
+  ];
+
+  var TRAITS = [
+    {key:"E", name:"Extraversion",        color:"#C1A069", desc:"How much energy you draw from being around people, being active, and speaking up. Higher scores point to a more outgoing, talkative style. Lower scores point to a quieter, more reserved one."},
+    {key:"A", name:"Agreeableness",       color:"#91A66D", desc:"How trusting, kind, and cooperative you tend to be with other people. Higher scores suggest you give others the benefit of the doubt. Lower scores suggest you are more skeptical and direct."},
+    {key:"C", name:"Conscientiousness",   color:"#172D60", desc:"How organized, careful, and dependable you are when it comes to getting things done. Higher scores suggest you plan ahead and follow through. Lower scores suggest a more spontaneous, flexible approach."},
+    {key:"S", name:"Emotional Stability", color:"#847296", desc:"How calm and steady you stay when things get stressful. Higher scores suggest you stay even-tempered under pressure. Lower scores suggest you feel worry and stress more strongly."},
+    {key:"O", name:"Openness",            color:"#B9705A", desc:"How curious and imaginative you are, and how much you enjoy art, ideas, and new experiences. Higher scores suggest a love of novelty. Lower scores suggest a preference for the practical and familiar."}
+  ];
+
+  var LABELS = ["Disagree strongly","Disagree a little","Neither agree nor disagree","Agree a little","Agree strongly"];
+
+  // ---- Scoring (same rules as the spreadsheet) ----
+  function scoreItem(resp, rev){ return rev ? 6 - resp : resp; }
+  function interpret(avg){
+    if (avg >= 4.5) return "Very High";
+    if (avg >= 4)   return "High";
+    if (avg >= 2.5) return "Average";
+    if (avg >= 2)   return "Low";
+    return "Very Low";
+  }
+  function computeScores(responses){
+    var sums = {}, counts = {};
+    ITEMS.forEach(function(it,i){
+      var v = scoreItem(responses[i], it.rev);
+      sums[it.trait] = (sums[it.trait]||0) + v;
+      counts[it.trait] = (counts[it.trait]||0) + 1;
+    });
+    return TRAITS.map(function(t){
+      var avg = sums[t.key]/counts[t.key];
+      return {key:t.key, name:t.name, color:t.color, desc:t.desc, avg:avg, level:interpret(avg)};
+    });
+  }
+  window.__bfi = {computeScores:computeScores, interpret:interpret, ITEMS:ITEMS}; // handy for testing
+
+  // ---- Build form ----
+  var form = document.getElementById("form");
+  ITEMS.forEach(function(it,i){
+    var fs = document.createElement("fieldset");
+    fs.className = "q"; fs.id = "q"+i;
+    var html = '<legend><span class="qnum">'+(i+1)+'</span>'+it.text+'</legend><div class="scale">';
+    for (var v=1; v<=5; v++){
+      html += '<label><input type="radio" name="item'+i+'" value="'+v+'" required>'+
+              '<span class="pill"><b>'+v+'</b>'+LABELS[v-1]+'</span></label>';
+    }
+    html += '</div>';
+    fs.innerHTML = html;
+    form.appendChild(fs);
+  });
+
+  var pfill = document.getElementById("pfill"), pbar = document.getElementById("pbar"),
+      count = document.getElementById("count"), hint = document.getElementById("hint");
+
+  function getResponses(){
+    return ITEMS.map(function(_,i){
+      var c = form.querySelector('input[name="item'+i+'"]:checked');
+      return c ? parseInt(c.value,10) : null;
+    });
+  }
+  function updateProgress(){
+    var n = getResponses().filter(function(x){return x!==null}).length;
+    pfill.style.width = (n*10)+"%"; count.textContent = n+" of 10"; pbar.setAttribute("aria-valuenow", n);
+    if (n === 10) hint.textContent = "";
+  }
+  form.addEventListener("change", function(e){
+    var fs = e.target.closest("fieldset"); if (fs) fs.classList.remove("missing");
+    updateProgress();
+  });
+
+  // ---- Results ----
+  function polar(cx, cy, r, i, n){
+    var a = -Math.PI/2 + i*2*Math.PI/n;
+    return [cx + r*Math.cos(a), cy + r*Math.sin(a)];
+  }
+  function drawRadar(scores){
+    var W=640, H=420, cx=320, cy=215, R=140, n=scores.length, s="";
+    s += '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Radar chart of your five trait scores: '+
+         scores.map(function(x){return x.name+" "+x.avg.toFixed(1)}).join(", ")+'">';
+    // soft rings
+    for (var ring=1; ring<=5; ring++){
+      var pts = scores.map(function(_,i){return polar(cx,cy,R*ring/5,i,n).join(",")}).join(" ");
+      s += '<polygon points="'+pts+'" fill="'+(ring%2? "#FBF9F3":"#F3EFE2")+'" stroke="#DDD6C2" stroke-width="1"/>';
+    }
+    // spokes + ring numbers
+    scores.forEach(function(_,i){
+      var p = polar(cx,cy,R,i,n);
+      s += '<line x1="'+cx+'" y1="'+cy+'" x2="'+p[0]+'" y2="'+p[1]+'" stroke="#DDD6C2" stroke-width="1"/>';
+    });
+    for (var k=1;k<=5;k++){
+      s += '<text x="'+(cx+5)+'" y="'+(cy-R*k/5+4)+'" font-size="12" fill="#8a8f9e">'+k+'</text>';
+    }
+    // data polygon
+    var dpts = scores.map(function(x,i){return polar(cx,cy,R*x.avg/5,i,n).join(",")}).join(" ");
+    s += '<defs><linearGradient id="fillg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#172D60" stop-opacity=".38"/><stop offset="1" stop-color="#847296" stop-opacity=".38"/></linearGradient></defs>';
+    s += '<polygon points="'+dpts+'" fill="url(#fillg)" stroke="#172D60" stroke-width="3" stroke-linejoin="round"/>';
+    // dots + labels
+    scores.forEach(function(x,i){
+      var p = polar(cx,cy,R*x.avg/5,i,n);
+      s += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="9" fill="'+x.color+'" stroke="#fff" stroke-width="3"/>';
+      var lp = polar(cx,cy,R+30,i,n);
+      var anchor = ["middle","start","middle","middle","end"][i];
+      var lx = lp[0] + (i===1?4:(i===4?-4:0));
+      var dy = i===0 ? -26 : (i>=2 && i<=3 ? 14 : -6);
+      s += '<text x="'+lx+'" y="'+(lp[1]+dy)+'" text-anchor="'+anchor+'" font-size="20" font-weight="700" fill="#172D60">'+x.name+'</text>';
+      s += '<text x="'+lx+'" y="'+(lp[1]+dy+22)+'" text-anchor="'+anchor+'" font-size="17" fill="'+(x.key==="E"?"#8a6f3a":x.color)+'" font-weight="700">'+x.avg.toFixed(1)+' · '+x.level+'</text>';
+    });
+    s += '</svg>';
+    document.getElementById("radar").innerHTML = s;
+  }
+  function drawTraits(scores){
+    var box = document.getElementById("traits"); box.innerHTML = "";
+    scores.forEach(function(x){
+      var d = document.createElement("div"); d.className = "trait";
+      d.innerHTML =
+        '<div class="trait-top"><span class="dot" style="background:'+x.color+'"></span>'+
+        '<h3>'+x.name+'</h3><span class="chip" style="background:'+x.color+'">'+x.level+'</span>'+
+        '<span class="score">'+x.avg.toFixed(1)+' / 5</span></div>'+
+        '<div class="bar" role="img" aria-label="'+x.name+' '+x.avg.toFixed(1)+' out of 5"><i style="background:'+x.color+'" data-w="'+(x.avg/5*100)+'"></i></div>'+
+        '<p>'+x.desc+'</p>';
+      box.appendChild(d);
+    });
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      box.querySelectorAll("i[data-w]").forEach(function(el){ el.style.width = el.getAttribute("data-w")+"%"; });
+    });});
+  }
+
+  document.getElementById("submit").addEventListener("click", function(){
+    var r = getResponses(), firstMissing = -1;
+    r.forEach(function(v,i){
+      var fs = document.getElementById("q"+i);
+      if (v===null){ fs.classList.add("missing"); if (firstMissing<0) firstMissing = i; }
+    });
+    if (firstMissing >= 0){
+      var left = r.filter(function(v){return v===null}).length;
+      hint.textContent = left+" statement"+(left>1?"s":"")+" still need"+(left>1?"":"s")+" an answer.";
+      document.getElementById("q"+firstMissing).scrollIntoView({behavior:"smooth", block:"center"});
+      return;
+    }
+    var scores = computeScores(r);
+    drawRadar(scores); drawTraits(scores);
+    document.getElementById("quiz").style.display = "none";
+    var res = document.getElementById("results"); res.classList.add("show");
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+  document.getElementById("print").addEventListener("click", function(){ window.print(); });
+  document.getElementById("retake").addEventListener("click", function(){
+    form.reset(); updateProgress();
+    form.querySelectorAll(".missing").forEach(function(f){f.classList.remove("missing")});
+    document.getElementById("results").classList.remove("show");
+    document.getElementById("quiz").style.display = "";
+    window.scrollTo({top:0, behavior:"smooth"});
+  });
+})();
+</script>
+</body>
+</html>
