@@ -170,8 +170,18 @@
       <h3 style="margin-bottom:6px">Keep in mind</h3>
       <p style="margin:0;color:var(--muted);font-size:.95rem">This is a short, self-report snapshot of how you see yourself today. It is not a test, a diagnosis, or a prediction of what you can do. Personality traits describe tendencies, and people change and grow. Every part of the profile has strengths.</p>
     </div>
+    <div class="panel no-print">
+      <h3 style="margin-bottom:6px">Save your results</h3>
+      <p style="margin:0 0 12px;color:var(--muted);font-size:.95rem">Download a one-page PDF to keep or to bring to class if your teacher asks. You can add your name first (optional). It is only used on your PDF and is never sent anywhere.</p>
+      <label for="pdfname" style="display:block;font-weight:600;color:var(--navy);margin-bottom:4px">Your name (optional)</label>
+      <input id="pdfname" type="text" maxlength="60" autocomplete="off" style="font:inherit;padding:11px 14px;border:2px solid var(--line);border-radius:12px;width:100%;max-width:380px;background:#fcfbf7;color:var(--ink)">
+      <div class="actions" style="margin-top:16px">
+        <button type="button" id="pdf">Download my results (PDF)</button>
+        <span class="hint" id="pdfmsg" role="status" aria-live="polite"></span>
+      </div>
+    </div>
     <div class="actions no-print">
-      <button type="button" id="print">Print or save as PDF</button>
+      <button type="button" class="secondary" id="print">Print</button>
       <button type="button" class="secondary" id="retake">Take it again</button>
     </div>
   </section>
@@ -272,7 +282,7 @@
     var a = -Math.PI/2 + i*2*Math.PI/n;
     return [cx + r*Math.cos(a), cy + r*Math.sin(a)];
   }
-  function drawRadar(scores){
+  function radarSVG(scores){
     var W=640, H=420, cx=320, cy=215, R=140, n=scores.length, s="";
     s += '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Radar chart of your five trait scores: '+
          scores.map(function(x){return x.name+" "+x.avg.toFixed(1)}).join(", ")+'">';
@@ -305,7 +315,7 @@
       s += '<text x="'+lx+'" y="'+(lp[1]+dy+22)+'" text-anchor="'+anchor+'" font-size="17" fill="'+(x.key==="E"?"#8a6f3a":x.color)+'" font-weight="700">'+x.avg.toFixed(1)+' · '+x.level+'</text>';
     });
     s += '</svg>';
-    document.getElementById("radar").innerHTML = s;
+    return s;
   }
   function drawTraits(scores){
     var box = document.getElementById("traits"); box.innerHTML = "";
@@ -337,14 +347,122 @@
       return;
     }
     var scores = computeScores(r);
-    drawRadar(scores); drawTraits(scores);
+    lastScores = scores; document.getElementById('radar').innerHTML = radarSVG(scores); drawTraits(scores);
     document.getElementById("quiz").style.display = "none";
     var res = document.getElementById("results"); res.classList.add("show");
     window.scrollTo({top:0, behavior:"smooth"});
   });
+
+  // ---- PDF download (built in the browser, no libraries) ----
+  var lastScores = null;
+  var SERIF = "Georgia,'Times New Roman',serif", SANS = "'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif";
+  function wrapText(g, text, maxW){
+    var words = text.split(" "), lines = [], cur = "";
+    words.forEach(function(w){
+      var t = cur ? cur+" "+w : w;
+      if (g.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; } else cur = t;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function roundRect(g,x,y,w,h,r){
+    g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+    g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+  }
+  function buildReport(scores, name, done){
+    var W = 1700, H = 2200, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+    g.fillStyle = "#F7F4EC"; g.fillRect(0,0,W,H);
+    var date = new Date().toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"});
+
+    // header
+    g.fillStyle = "#172D60"; roundRect(g,60,60,W-120,200,28); g.fill();
+    g.fillStyle = "#fff"; g.font = "bold 64px "+SERIF; g.fillText("Big Five Personality Profile",110,150);
+    g.fillStyle = "#dfe4f1"; g.font = "30px "+SANS;
+    g.fillText(name ? name+"   |   "+date : date, 110, 198);
+    var cols = ["#C1A069","#91A66D","#847296","#B9705A","#FFFFFF"], bw = (W-220-4*12)/5;
+    cols.forEach(function(col,i){ g.fillStyle = col; roundRect(g,110+i*(bw+12),226,bw,10,5); g.fill(); });
+
+    g.fillStyle = "#5d6477"; g.font = "26px "+SANS;
+    g.fillText("Scores run from 1 (low) to 5 (high). No score is better or worse than another.", 80, 312);
+
+    // traits
+    function drawTraits(){
+      var y0 = 990;
+      scores.forEach(function(x,i){
+        var y = y0 + i*196;
+        g.fillStyle = x.color; g.beginPath(); g.arc(94,y+22,13,0,Math.PI*2); g.fill();
+        g.fillStyle = "#172D60"; g.font = "bold 36px "+SERIF; g.textAlign = "left"; g.fillText(x.name,124,y+34);
+        g.font = "bold 34px "+SANS; var sc = x.avg.toFixed(1)+" / 5", sw = g.measureText(sc).width;
+        g.textAlign = "right"; g.fillStyle = "#172D60"; g.fillText(sc, W-80, y+34);
+        g.font = "bold 24px "+SANS; var lw = g.measureText(x.level).width+40, lx = W-80-sw-24-lw;
+        g.fillStyle = x.color; roundRect(g,lx,y+4,lw,42,21); g.fill();
+        g.fillStyle = "#fff"; g.textAlign = "center"; g.fillText(x.level, lx+lw/2, y+34);
+        g.textAlign = "left";
+        g.fillStyle = "#eee9da"; roundRect(g,80,y+62,W-160,22,11); g.fill();
+        g.fillStyle = x.color; roundRect(g,80,y+62,Math.max(22,(W-160)*x.avg/5),22,11); g.fill();
+        g.fillStyle = "#5d6477"; g.font = "25px "+SANS;
+        wrapText(g,x.desc,W-160).forEach(function(l,k){ g.fillText(l,80,y+122+k*33); });
+      });
+      // footer
+      g.fillStyle = "#7a8094"; g.font = "21px "+SANS;
+      var foot = [
+        "This is a short self-report snapshot of how you see yourself today. It is not a test or a diagnosis.",
+        "The BFI-10 (Big Five Inventory) was developed by Beatrice Rammstedt & Oliver P. John. The instrument is available for non-commercial use (Source: GESIS).",
+        "Rammstedt, B., & John, O. P. (2007). Measuring personality in one minute or less: A 10-item short version of the Big Five Inventory in English and German. Journal of Research in Personality, 41(1), 203–212. https://doi.org/10.1016/j.jrp.2006.02.001"
+      ], fy = 2040;
+      g.strokeStyle = "#e0dac9"; g.lineWidth = 2; g.beginPath(); g.moveTo(80,2018); g.lineTo(W-80,2018); g.stroke();
+      foot.forEach(function(t){ wrapText(g,t,W-160).forEach(function(l){ g.fillText(l,80,fy); fy += 29; }); fy += 4; });
+      c.toBlob(function(b){ done(b); }, "image/jpeg", 0.93);
+    }
+
+    // radar: render the on-screen SVG into the canvas
+    var svg = radarSVG(scores).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,system-ui,Roboto,Arial,sans-serif" ').replace('width="100%"','width="960" height="630"');
+    var img = new Image();
+    img.onload = function(){ g.drawImage(img,(W-960)/2,330,960,630); drawTraits(); };
+    img.onerror = function(){ drawTraits(); };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+  function makePDF(jpeg, w, h){
+    var enc = new TextEncoder(), parts = [], offs = [], len = 0;
+    function add(x){ var b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; }
+    add("%PDF-1.4\n");
+    offs[1] = len; add("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+    offs[2] = len; add("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+    offs[3] = len; add("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\nendobj\n");
+    var content = "q 612 0 0 792 0 0 cm /Im0 Do Q";
+    offs[4] = len; add("4 0 obj\n<< /Length "+content.length+" >>\nstream\n"+content+"\nendstream\nendobj\n");
+    offs[5] = len; add("5 0 obj\n<< /Type /XObject /Subtype /Image /Width "+w+" /Height "+h+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+jpeg.length+" >>\nstream\n");
+    add(jpeg); add("\nendstream\nendobj\n");
+    var xref = len, x = "xref\n0 6\n0000000000 65535 f \n";
+    for (var i=1;i<=5;i++) x += ("0000000000"+offs[i]).slice(-10)+" 00000 n \n";
+    add(x+"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF");
+    var out = new Uint8Array(len), pos = 0;
+    parts.forEach(function(p){ out.set(p,pos); pos += p.length; });
+    return new Blob([out],{type:"application/pdf"});
+  }
+  document.getElementById("pdf").addEventListener("click", function(){
+    var msg = document.getElementById("pdfmsg");
+    if (!lastScores) return;
+    msg.textContent = "Building your PDF...";
+    var name = document.getElementById("pdfname").value.trim();
+    buildReport(lastScores, name, function(blob){
+      if (!blob){ msg.textContent = "Sorry, the PDF could not be created. Try the Print button instead."; return; }
+      blob.arrayBuffer().then(function(buf){
+        var pdf = makePDF(new Uint8Array(buf), 1700, 2200);
+        var a = document.createElement("a"), safe = name.replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"");
+        a.href = URL.createObjectURL(pdf);
+        a.download = "Big-Five-Results"+(safe?"-"+safe:"")+".pdf";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+        msg.textContent = "Downloaded. Check your Downloads folder.";
+      });
+    });
+  });
   document.getElementById("print").addEventListener("click", function(){ window.print(); });
   document.getElementById("retake").addEventListener("click", function(){
-    form.reset(); updateProgress();
+    form.reset(); updateProgress(); document.getElementById("pdfname").value=""; document.getElementById("pdfmsg").textContent="";
     form.querySelectorAll(".missing").forEach(function(f){f.classList.remove("missing")});
     document.getElementById("results").classList.remove("show");
     document.getElementById("quiz").style.display = "";
